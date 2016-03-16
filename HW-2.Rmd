@@ -1,6 +1,6 @@
 ---
 title: "MATH 216 Homework 2"
-author: "WRITE YOUR NAME HERE"
+author: "Mohamed Hussein"
 output: html_document
 ---
 
@@ -8,6 +8,7 @@ output: html_document
 suppressPackageStartupMessages(library(ggplot2))
 suppressPackageStartupMessages(library(dplyr))
 suppressPackageStartupMessages(library(foreign))
+suppressPackageStartupMessages(library(knitr))
 ```
 
 
@@ -41,53 +42,120 @@ pollution <- read.dta(url) %>%
   tbl_df()
 ```
 
-### a)
+### a) 
+It appears that a linear model does not adequetly describe the relationshion 
+between Nitric Oxide pollution levels and  mortality rates. This is confirmed by
+two pieces of evidence: First, This graph between the Nitric Oxide and mortality
+rates indicates a poor representation of the relationship, since the majority of 
+points are constrained below 100 and display a non-linear relationship. More to
+the point, the residual graphs does show a pattern, implying a non-constant variance. 
+
 
 ```{r, echo=FALSE, fig.width=12, fig.height=6}
+ggplot(data=pollution, aes(x = nox, y = mort))+
+      geom_point() +
+      ggtitle("Mortaility vs. Nitric Oxide Levels") +
+      xlab("Relative Nitric Oxide Pollution Potential") +
+      ylab("Total Age-adjusted Mortality Rate per 100,000") + 
+      theme(plot.title = element_text(lineheight=.8, face="bold")) + 
+      theme(axis.title.y=element_text(margin=margin(0,12,0,0))) + 
+      geom_smooth(method="lm", fullrange=TRUE) 
+
+model1a.1  <- lm(mort~nox, data=pollution)
+residuals1a.1 <- resid(model1a.1)
+
+ggplot(data=pollution, aes(x = nox, y = residuals1a.1))+
+      geom_point()+
+      ggtitle("Residuals vs. Nitric Oxide Levels") +
+      xlab("Relative Nitric Oxide Pollution Potential") +
+      ylab("Residuals")
 
 ```
 
 
 ### b)
+The residual graph shows a random dispersion of residuals, suggesting a constant 
+variance. Further, it appears as though the residuals are centered around zero. 
+This implies that our second model fits the data well. 
 
 ```{r, echo=FALSE, fig.width=12, fig.height=6}
+pollution <- pollution %>% 
+            mutate(log_nox=log(nox))
+
+  ggplot(data=pollution, aes(x=log_nox, y=mort)) +
+        geom_jitter() +
+        ggtitle("Mortaility vs. Logged Nitric Oxide Levels") +
+        xlab("Log of Relative Nitric Oxide Pollution Potential") +
+        ylab("Total Age-adjusted Mortality Rate per 100,000") + 
+        geom_smooth(method="lm", fullrange=TRUE) 
+
+model1b.1  <- lm(mort~log_nox, data=pollution)
+residuals1b.1 <- resid(model1b.1)
+
+ggplot(data=pollution, aes(x = log_nox, y = residuals1b.1))+
+      geom_point()+ 
+      ggtitle("Residuals vs. Logged Nitric Oxide Levels") +
+      xlab("Logged Relative Nitric Oxide Pollution Potential") +
+      ylab("Residuals")
 
 ```
 
 
 ### c)
+A one unit increase in the logged nitric oxide level would result in a 
+15.335 increase in the age-adjusted total mortality rate per 100,000. We are 
+95% confident that the effect lies between 2.13 and 28.5 increased mortailities 
+per 100,000 adjusted for age. 
+
 
 ```{r, echo=FALSE, fig.width=12, fig.height=6}
+log_model  <- lm(mort~log_nox, data=pollution)
+summary(log_model)
+confint(log_model)
 
 ```
 
 
 ### d)
+First, we determin the relationship between the two additional covariates and
+our outcome variable: 
+
 
 ```{r, echo=FALSE, fig.width=12, fig.height=6}
+ggplot(data=pollution, aes(x=hc, y=mort)) + geom_jitter()
+ggplot(data=pollution, aes(x=so2, y=mort)) + geom_jitter()
 
 ```
+It appears that there exists a non-linear relationship between our two new 
+dependent variables and our outcome variable that is best approximated 
+by a log transformation: 
 
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+pollution <- pollution %>% 
+             mutate(log_hc=log(hc)) %>% 
+             mutate(log_so2=log(so2))
+
+log_model2  <- lm(mort~log_nox + log_hc + log_so2, data=pollution)
+summary(log_model2)
+confint(log_model2)
+```
+
+From this new model we see that a one unit increase in the logged nitric oxide 
+levels lead to a 58.336 increase in the total mortality rate per 100,000 people, 
+controlling forlevels of sulphur dioxide and hydrocarbon. 
 
 ### e)
 
 ```{r, echo=FALSE, fig.width=12, fig.height=6}
 
 ```
-
+No clue how to approach this ... 
 
 ### f) What do you think are the reasons for using cross-validation?
-
-
-
-```{r, echo=FALSE, fig.width=12, fig.height=6}
-
-```
-
-
-
-
-
+Cross-validation tests the efficacy of a model by using a subset of the
+available dataset to fit the model, then testing its ability to predict using the
+the remainder of the dataset. This technique is preferable to evaluating 
+residuals as it demonstrates how well a model will do when facing 'new data.'
 
 
 ## Question 2:
@@ -110,12 +178,23 @@ profiles <- read.csv("profiles.csv", header=TRUE) %>% tbl_df()
 
 
 ```{r, echo=FALSE, fig.width=12, fig.height=6}
-# Feel free to make multiple code blocks, but set echo, fig.width, fig.height as 
-# above
+cont_var <- profiles %>%            
+            filter (income>0) %>% 
+            mutate (female=ifelse(sex=="f", 1, 0)) %>% 
+            summarise (age_mean_total=mean(age), na.rm=TRUE) %>% 
+            summarise (height_mean_total=mean(height), na.rm=TRUE) %>% 
+            summarise (income_mean_total=mean(income), na.rm=TRUE) %>% 
+#Broken down by sex: 
+            group_by(female) %>% 
+            summarise (age_mean=mean(age), na.rm=TRUE) %>% 
+            summarise (height_mean=mean(height), na.rm=TRUE) %>% 
+            summarise (income_mean=mean(income), na.rm=TRUE) %>% 
+            select(23:29)
+
+kable(cont_var, format="markdown")
+# #I suspect income =-1 is code for missing, we have to filter that out, otherwise
+# it skews the results. The challenge is could bias our results. We fix this by 
+# noting our decision in by the table. 
 ```
 
 
-```{r, echo=FALSE, fig.width=12, fig.height=6}
-# Feel free to make multiple code blocks, but set echo, fig.width, fig.height as 
-# above
-```
